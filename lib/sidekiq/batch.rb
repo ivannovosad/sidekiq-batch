@@ -1,6 +1,8 @@
 require 'securerandom'
 require 'sidekiq'
+require 'sidekiq/api'
 
+require_relative 'batch/api'
 require 'sidekiq/batch/callback'
 require 'sidekiq/batch/middleware'
 require 'sidekiq/batch/status'
@@ -92,6 +94,10 @@ module Sidekiq
               r.expire("BID-#{parent_bid}", BID_EXPIRE_TTL)
             end
 
+            if !@existing
+              r.zadd('batches', created_at + BID_EXPIRE_TTL, @bidkey)
+            end
+
             r.hincrby(@bidkey, "pending", @ready_to_queue.size)
             r.hincrby(@bidkey, "total", @ready_to_queue.size)
             r.expire(@bidkey, BID_EXPIRE_TTL)
@@ -146,7 +152,15 @@ module Sidekiq
     end
 
     class << self
-      def process_failed_job(bid, jid)
+      def process_failed_job(bid, jid, queue, ex)
+        m = ex.message.to_s[0, 10_000]
+        if m.respond_to?(:scrub!)
+          m.force_encoding('utf-8')
+          m.scrub!
+        end
+
+        info = Sidekiq.dump_json([ex.class.name, m])
+
         _, pending, failed, children, complete, parent_bid = Sidekiq.redis do |r|
           r.multi do
             r.sadd("BID-#{bid}-failed", jid)
@@ -158,6 +172,8 @@ module Sidekiq
             r.hget("BID-#{bid}", "parent_bid")
 
             r.expire("BID-#{bid}-failed", BID_EXPIRE_TTL)
+            r.hset("BID-#{bid}-failinfo", jid, info)
+            r.expire("BID-#{bid}-failinfo", BID_EXPIRE_TTL)
           end
         end
 
@@ -191,6 +207,7 @@ module Sidekiq
             r.srem("BID-#{bid}-failed", jid)
             r.srem("BID-#{bid}-jids", jid)
             r.expire("BID-#{bid}", BID_EXPIRE_TTL)
+            r.hdel("BID-#{bid}-failinfo", jid)
           end
         end
 
@@ -264,16 +281,20 @@ module Sidekiq
       def cleanup_redis(bid)
         Sidekiq.logger.debug {"Cleaning redis of batch #{bid}"}
         Sidekiq.redis do |r|
-          r.del(
-            "BID-#{bid}",
-            "BID-#{bid}-callbacks-complete",
-            "BID-#{bid}-callbacks-success",
-            "BID-#{bid}-failed",
+          r.multi do
+            r.del(
+              "BID-#{bid}",
+              "BID-#{bid}-callbacks-complete",
+              "BID-#{bid}-callbacks-success",
+              "BID-#{bid}-failed",
 
-            "BID-#{bid}-success",
-            "BID-#{bid}-complete",
-            "BID-#{bid}-jids",
-          )
+              "BID-#{bid}-success",
+              "BID-#{bid}-complete",
+              "BID-#{bid}-jids",
+              "BID-#{bid}-failinfo",
+            )
+            r.zrem('batches', "BID-#{bid}")
+          end
         end
       end
 

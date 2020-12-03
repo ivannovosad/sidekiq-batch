@@ -163,12 +163,12 @@ describe Sidekiq::Batch do
 
       it 'tries to call complete callback' do
         expect(Sidekiq::Batch).to receive(:enqueue_callbacks).with(:complete, bid)
-        Sidekiq::Batch.process_failed_job(bid, failed_jid)
+        Sidekiq::Batch.process_failed_job(bid, failed_jid, 'default', Exception.new)
       end
 
       it 'add job to failed list' do
-        Sidekiq::Batch.process_failed_job(bid, 'failed-job-id')
-        Sidekiq::Batch.process_failed_job(bid, failed_jid)
+        Sidekiq::Batch.process_failed_job(bid, 'failed-job-id', 'default', Exception.new)
+        Sidekiq::Batch.process_failed_job(bid, failed_jid, 'default', Exception.new)
         failed = Sidekiq.redis { |r| r.smembers("BID-#{bid}-failed") }
         expect(failed).to eq(['xxx', 'failed-job-id'])
       end
@@ -185,7 +185,7 @@ describe Sidekiq::Batch do
       before { batch.on(:complete, Object) }
       # before { batch.increment_job_queue(bid) }
       before { batch.jobs do TestWorker.perform_async end }
-      before { Sidekiq::Batch.process_failed_job(bid, 'failed-job-id') }
+      before { Sidekiq::Batch.process_failed_job(bid, 'failed-job-id', 'default', Exception.new) }
 
       it 'tries to call complete callback' do
         expect(Sidekiq::Batch).to receive(:enqueue_callbacks).with(:complete, bid)

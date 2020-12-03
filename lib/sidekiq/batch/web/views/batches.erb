@@ -1,0 +1,40 @@
+<h3><%= t('Batches') %></h3>
+
+<div class="table_container">
+  <table class="table table-hover table-bordered table-striped table-white">
+    <thead>
+      <tr>
+        <th><%= t('Bid') %></th>
+        <th><%= t('Started') %></th>
+        <th><%= t('Description') %></th>
+        <th><%= t('JobCount') %></th>
+        <th><%= t('Pending') %></th>
+        <th><%= t('Failed') %></th>
+        <th><%= t('Progress') %></th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% @batches.each do |batch| %>
+        <tr>
+          <td>
+            <a href="<%= root_path %>batches/<%= batch.bid %>"><%= batch.bid %></a>
+          </td>
+          <td><%= relative_time(batch.created_at.utc) %></td>
+          <td><%= batch.description %></td>
+          <td><%= batch.total %></td>
+          <td><%= batch.pending %></td>
+          <td><%= batch.failures %></td>
+          <td>
+            <div class="progress" style="margin-bottom: 0">
+              <div class="progress-bar progress-bar-success" style="width: <%= batch.success_pct %>%;"></div>
+              <div class="progress-bar progress-bar-warning" style="width: <%= batch.pending_pct %>%;"></div>
+              <div class="progress-bar progress-bar-danger progress-bar-striped" style="width: <%= batch.failure_pct %>%;"></div>
+            </div>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+</div>
