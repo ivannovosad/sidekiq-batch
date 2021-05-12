@@ -17,6 +17,7 @@ module Sidekiq
             normalized_id = batch_id.delete_prefix('BID-')
             Status.new(normalized_id)
           end
+          @batches.select! { |batch| batch.created_at.present? }
 
           erb VIEW_PATH.join('batches.erb').read
         end

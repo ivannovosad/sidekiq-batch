@@ -20,11 +20,7 @@
           <td>
             <a href="<%= root_path %>batches/<%= batch.bid %>"><%= batch.bid %></a>
           </td>
-          <td>
-            <% if created_at = batch.created_at.presence %>
-              <%= relative_time(created_at.utc) %>
-            <% end %>
-          </td>
+          <td><%= relative_time(created_at.utc) %></td>
           <td><%= batch.description %></td>
           <td><%= batch.total %></td>
           <td><%= batch.pending %></td>
